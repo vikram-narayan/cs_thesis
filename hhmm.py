@@ -149,7 +149,6 @@ class HHMM:
 				if child.type is INTERNAL_STATE:
 					q.put(child)
 
-
 	def traverse(self, node):
 
 		emission_string=[]
@@ -181,12 +180,102 @@ class HHMM:
 
 			started=1
 
+	def is_SR(self, internal_node):
+		"""
+		checks whether an internal node is self referential (can transition to itself)
+		"""
+		if internal_node in internal_node.horizontal_transitions:
+			if internal_node.horizontal_transitions[internal_node] > 0:
+				return True
+		return False
+
+	def get_eof_state(self, node):
+		"""
+		Assumes the node has an EOF_STATE node in its horizontal_transitions dictionary 
+		"""
+		for brother in node.horizontal_transitions:
+			if brother.type==EOF_STATE:
+				return brother
+
+	def convert_to_minSR(self, internal_node):
+		"""
+		Converts a maximally self referential (maxSR) HHMM to a minSR HHMM.
+		Assumes: internal_node is an internal node, and can transition to itself
+		"""
+		# new horizontal transition probability is: existing transition probability PLUS 
+		# prob of going from state i to state j via their parent state
+		for child in internal_node.vertical_transitions:
+			if child.type==PRODUCTION_STATE:
+				for child2 in internal_node.vertical_transitions:
+					if child2.type==PRODUCTION_STATE:
+						child.horizontal_transitions[child2] = child.horizontal_transitions[child2] + (child.horizontal_transitions[self.get_eof_state(child)] * internal_node.horizontal_transitions[internal_node] * internal_node.vertical_transitions[child2])
+
+		# old probability of an internal state loop has to propagate back through
+		# the system
+		for child in internal_node.vertical_transitions:
+			if child.type==PRODUCTION_STATE:
+				child.horizontal_transitions[self.get_eof_state(child)] = child.horizontal_transitions[self.get_eof_state(child)] * (1-internal_node.horizontal_transitions[internal_node])
+
+		# set the probability of internal_node's self referential loop to 0
+		internal_node.horizontal_transitions[internal_node]=0
+
+		# normalize the new values
+		normalize(internal_node.horizontal_transitions)
+		for child in internal_node.vertical_transitions:
+			normalize(child.horizontal_transitions)
+
+	def get_pstates(self, node):
+		production_states=[]
+		for child in node.vertical_transitions:
+			if child.type==PRODUCTION_STATE:
+				production_states+=[child]
+			elif child.type==INTERNAL_STATE:
+				production_states+=self.get_pstates(child)
+		return production_states
+
+	def ps_to_root(self, node,current_product):
+		"""
+		Find product of the vertical probabilities from the root to a production state.
+		"""
+		if node==self.root:
+			return current_product
+		else:
+			return self.ps_to_root(node.parent, node.parent.vertical_transitions[node] * current_product)
+
+
 	def flatten(self):
 		"""
-		Flatten the hhmm according to the following rules:
+		flattens hhmm into an hmm 
 		"""
-		
+		production_states=self.get_pstates(self.root)
 
+		# probability of going from production state i to production state j =
+		# (i -> EOF state) * (i's parent -> j's parent) * (j's parent -> j)
+		for i in production_states:
+			for j in production_states:
+				if i.parent==j.parent:
+					continue
+				i_to_eof=i.horizontal_transitions[self.get_eof_state(i)]
+				iparent_to_jparent=i.parent.horizontal_transitions[j.parent]
+				jparent_to_j=j.parent.vertical_transitions[j]
+
+				i.horizontal_transitions[j] = i_to_eof * iparent_to_jparent * jparent_to_j
+
+		# vertical transition probabilities transformed into initial activation probabilities
+		# by computing the product of vertical probs from root state to production state
+		for i in production_states:
+			self.root.vertical_transitions[i] = self.ps_to_root(i,1)
+
+		# remove internal states to flatten the model
+		delete_list=[]
+		for state in self.root.vertical_transitions:
+			if state.type!=PRODUCTION_STATE:
+				delete_list.append(state)
+		for item in delete_list:
+			del self.root.vertical_transitions[item]
+
+		self.flattened=True
+		pdb.set_trace()
 
 if __name__ == "__main__":
 	hhmm = HHMM()
@@ -203,10 +292,18 @@ if __name__ == "__main__":
 	normalize(parent.vertical_transitions)
 	hhmm.initialize_horizontal_probs(parent)
 
-	# for child in parent.vertical_transitions:
-	# 	normalize(child.horizontal_transitions)
-	# 	print child.horizontal_transitions, "\n\n"
+	# testing self referential loop stuff
+	for internal_node in parent.vertical_transitions:
+		if internal_node.type==INTERNAL_STATE:
+			sr=hhmm.is_SR(internal_node)
+			print "This internal node has a self referential loop:",sr
+			if sr:
+				print internal_node.horizontal_transitions, "\n\n"
+				hhmm.convert_to_minSR(internal_node)
+			else: 
+				print internal_node.type
 
-	print "STARTING TRAVERSAL"
-	emissions=hhmm.traverse(hhmm.root)
-	write_midi(emissions)
+	hhmm.flatten()
+	# print "STARTING TRAVERSAL"
+	# emissions=hhmm.traverse(hhmm.root)
+	# write_midi(emissions)
