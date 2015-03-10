@@ -57,6 +57,23 @@ class HMM:
         self.transitions[hierarchicalHMM.root]= copy.copy(hierarchicalHMM.root.vertical_transitions)
         self.start = (hierarchicalHMM.root)
 
+        # domain specific phrase information 
+        # self.phrase_begs=[]
+        # self.phrase_ends=[]
+
+        # print len(self.transitions[self.start])
+        # for transition in self.transitions[self.start]:
+        #     print transition.note
+        #     if transition.note=='(':
+        #         self.phrase_begs.append(transition)
+        #     elif transition.note==')':
+        #         self.phrase_ends.append(transition)
+        # self.transitions[self.start][self.phrase_begs[0]]=1
+        # self.transitions[self.phrase_ends[0]][self.phrase_begs[1]]=1
+        # self.transitions[self.phrase_ends[1]][self.phrase_begs[1]]=0.75
+        # self.transitions[self.phrase_ends[1]][self.phrase_begs[2]]=0.25
+        # self.transitions[self.phrase_ends[2]][self.start]=1
+
         self.observations = read_corpus(filename)
 
     def best_state_sequence(self, observation):
@@ -68,7 +85,6 @@ class HMM:
         for i in range(len(observation)):
             viterbi_path.append('')
 
-        # -- TODO --
         # initialize table for viterbi algorithm
         viterbi_table={}
         back_pointers={}
@@ -130,10 +146,39 @@ class HMM:
 
         return (viterbi_path,viterbi_path2)
 
+	# def forward_algorithm(self, observation):
+	# 	"""given an observation as a list of symbols,
+	# 	run the forward algorithm"""
+
+	# 	# initialize forward algorithm table
+	# 	fwd_table={}
+	# 	fwd_table['scaling factor']=[]
+	# 	for i in xrange(len(observation)):
+	# 		fwd_table['scaling factor'].append(0)
+
+	# 	for state in self.states:
+	# 		fwd_table[state]=[]
+	# 		for i in xrange(len(observation)):
+	# 			fwd_table[state].append(0)
+
+	# 	# initialize first col of fwd algorithm table
+	# 	for state in self.states:
+	# 		# logs will be taken at the end 
+	# 		fwd_table[state][0] = (self.transitions[self.start][state] * self.emissions[state][observation[0]] ) 
+
+	# 	# fill in the rest of the forward table
+	# 	for output in xrange(1,len(observation)):
+	# 		for state in self.states:
+	# 			fwd=0
+	# 			for prev_state in self.states:
+	# 				fwd+=fwd_table[prev_state][output-1] * self.transitions[prev_state][state] * self.emissions[state][observation[output]]
+	# 			fwd_table[state][output] = fwd
+
+	# 	return fwd_table
     def forward_algorithm(self, observation):
         """given an observation as a list of symbols,
         run the forward algorithm"""
-
+        
         # initialize forward algorithm table
         fwd_table={}
         fwd_table['scaling factor']=[]
@@ -159,7 +204,6 @@ class HMM:
                 fwd_table[state][output] = fwd
 
         return fwd_table
-
     def total_probability(self, observation):
         """compute the probability of the observation under the model"""
         observation=observation.split()
@@ -223,6 +267,134 @@ class HMM:
         return numpy.log10(bk_prob)
 
 
+    def expectation_maximization(self, corpus, convergence):
+        """given a corpus, which is a list of observations, and
+        apply EM to learn the HMM parameters that maximize the corpus likelihood.
+        stop when the log likelihood changes less than the convergence threhshold.
+        update self.transitions and self.emissions, and return the log likelihood
+        of the corpus under the final updated parameters."""
+        prev_log_likelihood=-float('inf')
+        while (True):
+            log_likelihood=0
+
+            # store emission soft counts
+            soft_count={}
+            for state in self.states:
+                soft_count[state]={}
+                for i in hhmm.notes:
+                    soft_count[state][i]=0
+
+            # store soft counts for transitions
+            soft_count_trans={}
+            soft_count_trans[self.start]={}
+            for state in self.states:
+                soft_count_trans[state]={}
+                soft_count_trans[self.start][state]=0
+                for state2 in self.states:
+                    soft_count_trans[state][state2]=0
+
+            for observation in corpus:
+                total_prob = self.total_probability(observation)
+                log_likelihood+=total_prob
+                fwd_matrix = self.forward_algorithm(observation.split())
+                bk_matrix = self.backward_algorithm(observation.split())
+
+                # new_emissions stores the counts for observation
+                new_emissions = {}
+                # new_transitions={}
+
+                for state in self.states:
+                    new_emissions[state]=[]
+                    for i in range(len(observation.split())):
+                        new_emissions[state].append(0)
+
+                # emission soft counts
+                for i in range(len(observation.split())):
+                    for state in self.states:
+                        new_emissions[state][i] = fwd_matrix[state][i] * bk_matrix[state][i+1] 
+                        new_emissions[state][i] = new_emissions[state][i]/(10**total_prob)
+                        if soft_count[state].has_key(observation.split()[i]):
+                            soft_count[state][observation.split()[i]]+=new_emissions[state][i]
+                        else:
+                            soft_count[state][observation.split()[i]]=new_emissions[state][i]
+
+                # transition soft counts
+                for i in range(len(observation.split())-1):
+                    for state in self.states:
+                        for state2 in self.states:
+                            soft_count_trans[state][state2]+=(fwd_matrix[state][i] * self.transitions[state][state2] * self.emissions[state2][observation.split()[i+1]] * bk_matrix[state2][i+2])/(10**total_prob)
+
+                # update transition probabilities from start
+                for state in self.states:
+                    soft_count_trans[self.start][state]+= (self.transitions[self.start][state] * self.emissions[state][observation.split()[0]]* bk_matrix[state][1])/(10**total_prob) 
+                # bss = self.best_state_sequence(observation)
+                # for state in self.states:
+                #     # if bss[0]==state:
+                #     soft_count_trans[self.start][state]+=total_prob * self.emissions[state][observation[0]]
+
+            #normalize emission soft counts
+            for state in self.states:
+                running_sum=0
+                for letter in soft_count[state]:
+                    running_sum+=soft_count[state][letter]
+                for letter in soft_count[state]:
+                    soft_count[state][letter] =soft_count[state][letter]/running_sum
+
+            #update emission probabilities
+            for state in self.states:
+                for letter in soft_count[state]:
+                    if soft_count[state][letter]!=0:
+                        self.emissions[state][letter] = soft_count[state][letter]
+
+            #normalize transition soft counts
+            for state in self.states:
+                running_sum=0
+                for state2 in self.states:
+                    running_sum+= soft_count_trans[state][state2]
+                for state2 in self.states:
+                    soft_count_trans[state][state2] = soft_count_trans[state][state2]/running_sum
+
+            running_sum=0
+            for state in self.states:
+                running_sum+=soft_count_trans[self.start][state]
+            for state in self.states:
+                soft_count_trans[self.start][state] = soft_count_trans[self.start][state]/running_sum
+            
+            #update transition probabilities
+            for state in self.states:
+                for state2 in self.states:
+                    self.transitions[state][state2] = soft_count_trans[state][state2]
+
+            for state in self.states:
+                self.transitions[self.start][state] =soft_count_trans[self.start][state]
+            
+            print log_likelihood-prev_log_likelihood
+
+            if (log_likelihood - prev_log_likelihood) < convergence:
+                return log_likelihood
+
+            prev_log_likelihood=log_likelihood
+
+        return log_likelihood
+
+    # def post_processing(self):
+    # 	"""after an hmm has been trained, the probabilities of certain states
+    # 	must be adjusted (as per the Weiland paper)"""
+
+    def generate(self):
+    	"""after an hmm has been trained, use it to generate songs"""
+    	current=self.start
+    	emission_notes=[]
+      	current = hhmm.probabilistic_choice(self.transitions[current])
+      	emission_notes.append(hhmm.probabilistic_choice(self.emissions[current]))
+    	while True:
+      		current = hhmm.probabilistic_choice(self.transitions[current])
+    		if current.type==hhmm.EOF_STATE or current==self.start:
+    			break
+	      	emission_notes.append(hhmm.probabilistic_choice(self.emissions[current]))
+
+    	hhmm.write_midi(emission_notes)
+
 if __name__=='__main__':
 	hierarchicalHMM = hhmm.HHMM()
 
@@ -248,7 +420,10 @@ if __name__=='__main__':
 
 	hierarchicalHMM.flatten()
 	hmm = HMM(hierarchicalHMM, 'bach_chorales_a4.data')
-	x=hmm.best_state_sequence(hmm.observations[340])
-	y=hmm.total_probability(hmm.observations[329])
-	z=hmm.total_probability_bk(hmm.observations[329])
+	# x=hmm.best_state_sequence(hmm.observations[340])
+	# y=hmm.total_probability(hmm.observations[329])
+	# z=hmm.total_probability_bk(hmm.observations[329])
+	alpha=hmm.expectation_maximization(hmm.observations[:15],convergence=1.0)
+	for i in xrange(4):
+		hmm.generate()
 	pdb.set_trace()
