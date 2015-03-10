@@ -15,8 +15,18 @@ PRODUCTION_STATE = 0
 INTERNAL_STATE = 1
 EOF_STATE=2
 
-# notes=["(", "c","c_#","d","e_b","e","f","f_#","g","a_b","a","b_b","b", ")"]
-notes=["(", "c4","c#4","d4","e-4","e4","f4","f#4","g4","a-4","a4","b-4","b4", ")"]
+notes={}
+f=open('bach_chorales_a4.data')
+f2=f.read().split()
+for item in f2:
+	if item=='\n':
+		continue
+	else:
+		notes[item]=''
+f.close()
+notes = list(notes)
+
+# notes=["(", "c4","c#4","d4","e-4","e4","f4","f#4","g4","a-4","a4","b-4","b4", ")"]
 # notes=['a','b']
 
 def normalize(probability_dictionary):
@@ -43,7 +53,7 @@ def write_midi(sequence, note_type='quarter'):
 	"""
 	Writes an emission sequence to a MIDI file using music21.
 	"""
-	note_types = ['quarter', 'half', 'whole', '32nd']
+	note_types = ['quarter']#, 'half', 'whole', '32nd']
 	stream_notes = music21.stream.Stream()
 	four_by_four = music21.meter.TimeSignature('4/4')
 	stream_notes.append(four_by_four)
@@ -275,7 +285,20 @@ class HHMM:
 			del self.root.vertical_transitions[item]
 
 		self.flattened=True
-		pdb.set_trace()
+
+	def traverse_flattened(self):
+		"""
+		traverses a flattened hhmm.
+		"""
+		emission_string=[]
+		if self.flattened:
+			current=probabilistic_choice(self.root.vertical_transitions)
+			while True:
+				if current.type==PRODUCTION_STATE:
+					emission_string.append(current.note)
+					current=probabilistic_choice(current.horizontal_transitions)
+				elif current.type==EOF_STATE:
+					break # this behavior may need to be changed
 
 if __name__ == "__main__":
 	hhmm = HHMM()
@@ -296,9 +319,8 @@ if __name__ == "__main__":
 	for internal_node in parent.vertical_transitions:
 		if internal_node.type==INTERNAL_STATE:
 			sr=hhmm.is_SR(internal_node)
-			print "This internal node has a self referential loop:",sr
 			if sr:
-				print internal_node.horizontal_transitions, "\n\n"
+				# print internal_node.horizontal_transitions, "\n\n"
 				hhmm.convert_to_minSR(internal_node)
 			else: 
 				print internal_node.type

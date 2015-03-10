@@ -16,13 +16,13 @@ def write_to_file(transposed_chorale, file_name):
 			note_val = str(item).split(' ')[1].split('>')[0]
 			print note_val
 			print item
-			if note_val.quarterLength==1:
+			if item.quarterLength==1:
 				# if the note is a quarter note, just write it
 				f.write(' '+note_val)
-			elif note_val.quarterLength>1:
+			elif item.quarterLength>1:
 				# if the note is more than a quarter note, write in the
 				# number of quarter notes that could fit in the note
-				temp=note_val.quarterLength
+				temp=item.quarterLength
 				while temp >= 1:
 					f.write(' '+note_val)
 					temp-=1
@@ -39,7 +39,7 @@ def write_to_file(transposed_chorale, file_name):
 				# 	f.write(' '+note_val)
 				f.write(' '+note_val)
 
-	f.write(')\n')
+	f.write(' )\n')
 	f.close()
 
 for chorale in corpus.chorales.Iterator():

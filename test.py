@@ -14,7 +14,6 @@ c.show('text')
 fp = converter.freeze(c, fmt='pickle')
 print fp
 """
-
 data1 = [('g4', 'quarter'), ('a4', 'quarter'), ('b4', 'quarter'), ('c#5', 'quarter')]
 data2 = [('d5', 'whole')]
 data = [data1, data2]
