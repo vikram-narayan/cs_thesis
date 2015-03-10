@@ -423,7 +423,7 @@ if __name__=='__main__':
 	# x=hmm.best_state_sequence(hmm.observations[340])
 	# y=hmm.total_probability(hmm.observations[329])
 	# z=hmm.total_probability_bk(hmm.observations[329])
-	alpha=hmm.expectation_maximization(hmm.observations[:15],convergence=1.0)
+	alpha=hmm.expectation_maximization(hmm.observations[:10],convergence=0.1)
 	for i in xrange(4):
 		hmm.generate()
 	pdb.set_trace()
