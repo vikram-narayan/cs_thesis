@@ -10,13 +10,15 @@ import numpy
 import time
 import Queue
 import music21
+import os
 
 PRODUCTION_STATE = 0
 INTERNAL_STATE = 1
 EOF_STATE=2
 
+# make a dictionary of all possible notes 
 notes={}
-f=open('bach_chorales_a4.data')
+f=open('bach_chorales_cmajor_aminor_midi.data')
 f2=f.read().split()
 for item in f2:
 	if item=='\n':
@@ -30,14 +32,14 @@ notes = list(notes)
 # notes=['a','b']
 
 def normalize(probability_dictionary):
-	"""
-	Assumes the only values in the dictionary are numbers.
-	"""
+	"""Assumes the only values in the dictionary are numbers."""
 	total_sum = sum(probability_dictionary[key] for key in probability_dictionary) * 1.0
 	for key in probability_dictionary:
 		probability_dictionary[key] = probability_dictionary[key]/total_sum 
+	return probability_dictionary
 
 def probabilistic_choice(probability_dictionary):
+	"""Probabilistically choose from a dictionary of probabilities."""
 	mixed_keys = probability_dictionary.keys()
 	random.shuffle(mixed_keys)
 	n = numpy.random.uniform()
@@ -50,19 +52,52 @@ def probabilistic_choice(probability_dictionary):
 	return mixed_keys[0]
 
 def write_midi(sequence, note_type='quarter'):
-	"""
-	Writes an emission sequence to a MIDI file using music21.
-	"""
+	"""Writes an emission sequence to a MIDI file using music21."""
+	# the types of notes from which to select
 	note_types = ['quarter']#, 'half', 'whole', '32nd']
 	stream_notes = music21.stream.Stream()
+
+	# currently we default to a 4/4 time sig, this may change in the future
 	four_by_four = music21.meter.TimeSignature('4/4')
 	stream_notes.append(four_by_four)
 	for letter in sequence:
-		if letter=='(' or letter==')':
-			continue
-		n = music21.note.Note(letter, type=random.choice(note_types))
-		stream_notes.append(n)
+		if letter==')' or letter=='fermata':
+			n = music21.note.Note(type='whole')
+			n.pitch.midi = int(letter)
+			stream_notes.append(n)
+		else:
+			n = music21.note.Note(type=random.choice(note_types))
+			n.pitch.midi = int(letter)
+			stream_notes.append(n)
 	stream_notes.show()
+
+def write_flattenedHHMM_tofile(hhmm, filename):
+	"""write a flattened hhmm to a .hhmmt file (for transitions), and a
+	.hhmme file (for emissions). Both are tab separated"""
+	if hhmm.flattened:
+		f=open(filename+'.hhmmt', 'w')
+		# make a node list to ensure a consistent order when the transition 
+		# matrix is written
+		node_list = list(hhmm.root.vertical_transitions)
+		for node1 in node_list:
+			for node2 in node_list:
+				if node2 in node1.horizontal_transitions:
+					f.write(str(node1.horizontal_transitions[node2])+'\t')
+				else:
+					f.write('0\t')
+			f.write('\n')
+		f.close()
+
+		# note emissions are writtened to files in the form
+		# note,probability\tnote,probability ...etc.
+		f2=open(filename+'.hhmme','w')
+		for node in node_list:
+			for note in node.emissions:
+				f2.write(str(note)+','+str(node.emissions[note])+'\t')
+			f2.write('\n')
+		f2.close()
+	else:
+		print "Error: HHMM not flattened."
 
 class InternalState:
 	def __init__(self, parent, root = False):
@@ -73,6 +108,7 @@ class InternalState:
 		self.horizontal_transitions = {}
 		self.vertical_transitions = {} 
 		self.depth=0
+		self.name=None
 		if root==False:
 			self.depth = parent.depth+1
 
@@ -85,6 +121,7 @@ class ProductionState:
 		self.emissions = {}
 		self.emissions[note]=1
 		self.depth = parent.depth+1
+		self.name=None
 
 class EOFState:
 	def __init__(self, parent):
@@ -99,14 +136,20 @@ class HHMM:
 		self.root = InternalState(None, True) 
 		self.nodes = 1
 		self.flattened=False 
+		# only certain nodes we need to access later will be available in the node dict
+		self.node_dict = {} 
 
-	def create_child(self, parent_node, internal=True, note=None):
+	def create_child(self, parent_node, internal=True, note=None, name=None):
 		self.create_eof(parent_node)
 
 		if internal:
 			new_node = InternalState(parent_node)
 		else:
 			new_node = ProductionState(parent_node, note)
+
+		if name:
+			new_node.name=name
+			self.node_dict[new_node.name]=new_node
 
 		parent_node.vertical_transitions[new_node] = 1
 		self.nodes += 1
@@ -160,7 +203,7 @@ class HHMM:
 					q.put(child)
 
 	def traverse(self, node):
-
+		"""traverse an hhmm"""
 		emission_string=[]
 		started=0
 		current_node=self.root
@@ -235,6 +278,7 @@ class HHMM:
 			normalize(child.horizontal_transitions)
 
 	def get_pstates(self, node):
+		"""return a list of all production states of an hhmm"""
 		production_states=[]
 		for child in node.vertical_transitions:
 			if child.type==PRODUCTION_STATE:
@@ -250,7 +294,14 @@ class HHMM:
 		if node==self.root:
 			return current_product
 		else:
-			return self.ps_to_root(node.parent, node.parent.vertical_transitions[node] * current_product)
+			while True:
+				current_product = current_product * node.parent.vertical_transitions[node]
+				if node.parent==self.root:
+					return current_product
+				else: 
+					node=node.parent
+			# return self.ps_to_root(node.parent, node.parent.vertical_transitions[node] * current_product)
+
 
 
 	def flatten(self):
@@ -300,22 +351,86 @@ class HHMM:
 				elif current.type==EOF_STATE:
 					break # this behavior may need to be changed
 
+
+	def check_probs(self, nodedict):
+		"""checks if a node's vertical/horizontal transition dictionaries sum to 1"""
+		print sum(nodedict.values())
+
 if __name__ == "__main__":
 	hhmm = HHMM()
 
 	# create sub-states for beginning, middle, and end,
 	# create production states for each note
 	parent = hhmm.root
-	for i in xrange(3):
-		new_child = hhmm.create_child(parent)
+	for i in ['beginning', 'middle', 'end']:
+		new_child = hhmm.create_child(parent, name=i)
 		for note in notes:
 			hhmm.create_child(new_child, internal=False, note=note)
+		hhmm.initialize_horizontal_probs(new_child)
 		normalize(new_child.vertical_transitions)
 
-	normalize(parent.vertical_transitions)
 	hhmm.initialize_horizontal_probs(parent)
+	normalize(parent.vertical_transitions)
+
+	beginning_node=hhmm.node_dict['beginning']
+	middle_node=hhmm.node_dict['middle']
+	end_node=hhmm.node_dict['end']
+
+	# change probabilities as follows: 
+
+	# P(root->beginning_node)=1
+	parent.vertical_transitions[beginning_node]=1
+	for node in parent.vertical_transitions:
+		if node==beginning_node:
+			continue
+		parent.vertical_transitions[node]=0
+
+	# P(beginning->middle)=1
+	beginning_node.horizontal_transitions[middle_node]=1
+	for node in beginning_node.horizontal_transitions:
+		if node==middle_node:
+			continue
+		beginning_node.horizontal_transitions[node]=0
+
+
+	# P(middle->middle)=0.7 (note this is just preliminary, and may change)
+	middle_node.horizontal_transitions[middle_node]=0.7
+	# P(middle->end)=0.3
+	middle_node.horizontal_transitions[end_node]=0.3
+	for node in middle_node.horizontal_transitions:
+		if node==middle_node or node==end_node:
+			continue
+		middle_node.horizontal_transitions[node]=0
+
+	# P(end->EOF)=1
+	eof_node=hhmm.get_eof_state(end_node)
+	end_node.horizontal_transitions[eof_node]=1
+	for node in end_node.horizontal_transitions:
+		if node==eof_node:
+			continue
+		end_node.horizontal_transitions[node]=0
+
+	# within each of [beginning, middle, end], p(internalstate->'(')=1
+	# i.e., each phrase must begin with a start-of-phrase symbol
+	# P(')'->EOF)=1
+	for i in [beginning_node, middle_node, end_node]:
+		for pstate in hhmm.get_pstates(i):
+			eof_node=hhmm.get_eof_state(pstate)
+			if pstate.note=='(':
+				i.vertical_transitions[pstate]=1
+				for node in i.vertical_transitions:
+					if node!=pstate:
+						i.vertical_transitions[node]=0
+			elif pstate.note==')':
+				pstate.horizontal_transitions[eof_node]=1
+				for node in pstate.horizontal_transitions:
+					if node!=eof_node:
+						pstate.horizontal_transitions[node]=0
+			else:
+				pstate.horizontal_transitions[eof_node]=0
 
 	# testing self referential loop stuff
+	print "testing self referential loop..."
 	for internal_node in parent.vertical_transitions:
 		if internal_node.type==INTERNAL_STATE:
 			sr=hhmm.is_SR(internal_node)
@@ -326,6 +441,8 @@ if __name__ == "__main__":
 				print internal_node.type
 
 	hhmm.flatten()
+	pdb.set_trace()
+	# write_flattenedHHMM_tofile(hhmm,'hhmm_flattened')
 	# print "STARTING TRAVERSAL"
 	# emissions=hhmm.traverse(hhmm.root)
 	# write_midi(emissions)

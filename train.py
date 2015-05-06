@@ -18,29 +18,29 @@ import copy
 import hhmm
 
 def initialize_emission_probs(note, prob_of_note):
-	"""given note, initialize an emission probability dictionary
-	so that the given note occurs with likelihood prob_of_note, and
-	the remaining probability is divided among the remaining notes.
-	Assumes that prob_of_note is between 0 and 1 non-inclusive.
-	Assumes note is specified in a way analogoue with hhmm.notes"""
-	emission_probs={}
-	emission_probs[note]=prob_of_note
-	remainder=1-prob_of_note
-	other_notes_probs = remainder/(len(hhmm.notes)-1)
-	for n in hhmm.notes:
-		if n==note:
-			continue
-		emission_probs[n]=other_notes_probs
-	return emission_probs
+    """given note, initialize an emission probability dictionary
+    so that the given note occurs with likelihood prob_of_note, and
+    the remaining probability is divided among the remaining notes.
+    Assumes that prob_of_note is between 0 and 1 non-inclusive.
+    Assumes note is specified in a way analogoue with hhmm.notes"""
+    emission_probs={}
+    emission_probs[note]=prob_of_note
+    remainder=1-prob_of_note
+    other_notes_probs = remainder/(len(hhmm.notes)-1)
+    for n in hhmm.notes:
+        if n==note:
+            continue
+        emission_probs[n]=other_notes_probs
+    return emission_probs
 
 def read_corpus(filename):
-	"""reads corpus file"""
-	observations=[]
-	f=open(filename, 'r')
-	for line in f:
-		observations.append(line[:len(line)-1])
-	f.close()
-	return observations
+    """reads corpus file"""
+    observations=[]
+    f=open(filename, 'r')
+    for line in f:
+        observations.append(line[:len(line)-1])
+    f.close()
+    return observations
 
 class HMM:
     def __init__(self, hierarchicalHMM, filename):
@@ -49,10 +49,9 @@ class HMM:
         self.transitions={}
         self.emissions={}
         for state in hierarchicalHMM.root.vertical_transitions:
-        	self.transitions[state]=copy.copy(state.horizontal_transitions)
-	        self.emissions[state]=initialize_emission_probs(state.note, 0.99)
+            self.transitions[state]=copy.copy(state.horizontal_transitions)
+            self.emissions[state]=initialize_emission_probs(state.note, 0.99)
         self.states = hierarchicalHMM.root.vertical_transitions.keys()
-
         # probabilities transitioning from root state
         self.transitions[hierarchicalHMM.root]= copy.copy(hierarchicalHMM.root.vertical_transitions)
         self.start = (hierarchicalHMM.root)
@@ -146,35 +145,35 @@ class HMM:
 
         return (viterbi_path,viterbi_path2)
 
-	# def forward_algorithm(self, observation):
-	# 	"""given an observation as a list of symbols,
-	# 	run the forward algorithm"""
+    # def forward_algorithm(self, observation):
+    #     """given an observation as a list of symbols,
+    #     run the forward algorithm"""
 
-	# 	# initialize forward algorithm table
-	# 	fwd_table={}
-	# 	fwd_table['scaling factor']=[]
-	# 	for i in xrange(len(observation)):
-	# 		fwd_table['scaling factor'].append(0)
+    #     # initialize forward algorithm table
+    #     fwd_table={}
+    #     fwd_table['scaling factor']=[]
+    #     for i in xrange(len(observation)):
+    #         fwd_table['scaling factor'].append(0)
 
-	# 	for state in self.states:
-	# 		fwd_table[state]=[]
-	# 		for i in xrange(len(observation)):
-	# 			fwd_table[state].append(0)
+    #     for state in self.states:
+    #         fwd_table[state]=[]
+    #         for i in xrange(len(observation)):
+    #             fwd_table[state].append(0)
 
-	# 	# initialize first col of fwd algorithm table
-	# 	for state in self.states:
-	# 		# logs will be taken at the end 
-	# 		fwd_table[state][0] = (self.transitions[self.start][state] * self.emissions[state][observation[0]] ) 
+    #     # initialize first col of fwd algorithm table
+    #     for state in self.states:
+    #         # logs will be taken at the end 
+    #         fwd_table[state][0] = (self.transitions[self.start][state] * self.emissions[state][observation[0]] ) 
 
-	# 	# fill in the rest of the forward table
-	# 	for output in xrange(1,len(observation)):
-	# 		for state in self.states:
-	# 			fwd=0
-	# 			for prev_state in self.states:
-	# 				fwd+=fwd_table[prev_state][output-1] * self.transitions[prev_state][state] * self.emissions[state][observation[output]]
-	# 			fwd_table[state][output] = fwd
+    #     # fill in the rest of the forward table
+    #     for output in xrange(1,len(observation)):
+    #         for state in self.states:
+    #             fwd=0
+    #             for prev_state in self.states:
+    #                 fwd+=fwd_table[prev_state][output-1] * self.transitions[prev_state][state] * self.emissions[state][observation[output]]
+    #             fwd_table[state][output] = fwd
 
-	# 	return fwd_table
+    #     return fwd_table
     def forward_algorithm(self, observation):
         """given an observation as a list of symbols,
         run the forward algorithm"""
@@ -267,13 +266,14 @@ class HMM:
         return numpy.log10(bk_prob)
 
 
-    def expectation_maximization(self, corpus, convergence):
+    def expectation_maximization(self, corpus, convergence, iterations):
         """given a corpus, which is a list of observations, and
         apply EM to learn the HMM parameters that maximize the corpus likelihood.
         stop when the log likelihood changes less than the convergence threhshold.
         update self.transitions and self.emissions, and return the log likelihood
         of the corpus under the final updated parameters."""
         prev_log_likelihood=-float('inf')
+        epochs=0
         while (True):
             log_likelihood=0
 
@@ -298,7 +298,7 @@ class HMM:
                 log_likelihood+=total_prob
                 fwd_matrix = self.forward_algorithm(observation.split())
                 bk_matrix = self.backward_algorithm(observation.split())
-
+                print "total_prob =",total_prob
                 # new_emissions stores the counts for observation
                 new_emissions = {}
                 # new_transitions={}
@@ -307,7 +307,6 @@ class HMM:
                     new_emissions[state]=[]
                     for i in range(len(observation.split())):
                         new_emissions[state].append(0)
-
                 # emission soft counts
                 for i in range(len(observation.split())):
                     for state in self.states:
@@ -332,6 +331,7 @@ class HMM:
                 #     # if bss[0]==state:
                 #     soft_count_trans[self.start][state]+=total_prob * self.emissions[state][observation[0]]
 
+            pdb.set_trace()
             #normalize emission soft counts
             for state in self.states:
                 running_sum=0
@@ -340,90 +340,172 @@ class HMM:
                 for letter in soft_count[state]:
                     soft_count[state][letter] =soft_count[state][letter]/running_sum
 
-            #update emission probabilities
-            for state in self.states:
-                for letter in soft_count[state]:
-                    if soft_count[state][letter]!=0:
-                        self.emissions[state][letter] = soft_count[state][letter]
 
-            #normalize transition soft counts
-            for state in self.states:
-                running_sum=0
-                for state2 in self.states:
-                    running_sum+= soft_count_trans[state][state2]
-                for state2 in self.states:
-                    soft_count_trans[state][state2] = soft_count_trans[state][state2]/running_sum
 
-            running_sum=0
-            for state in self.states:
-                running_sum+=soft_count_trans[self.start][state]
-            for state in self.states:
-                soft_count_trans[self.start][state] = soft_count_trans[self.start][state]/running_sum
+        #     #update emission probabilities
+        #     for state in self.states:
+        #         for letter in soft_count[state]:
+        #             if soft_count[state][letter]!=0:
+        #                 self.emissions[state][letter] = soft_count[state][letter]
+
+        #     #normalize transition soft counts
+        #     for state in self.states:
+        #         running_sum=0
+        #         for state2 in self.states:
+        #             running_sum+= soft_count_trans[state][state2]
+        #         for state2 in self.states:
+        #             soft_count_trans[state][state2] = soft_count_trans[state][state2]/running_sum
+
+        #     running_sum=0
+        #     for state in self.states:
+        #         running_sum+=soft_count_trans[self.start][state]
+        #     for state in self.states:
+        #         soft_count_trans[self.start][state] = soft_count_trans[self.start][state]/running_sum
             
-            #update transition probabilities
-            for state in self.states:
-                for state2 in self.states:
-                    self.transitions[state][state2] = soft_count_trans[state][state2]
+        #     #update transition probabilities
+        #     for state in self.states:
+        #         for state2 in self.states:
+        #             self.transitions[state][state2] = soft_count_trans[state][state2]
 
-            for state in self.states:
-                self.transitions[self.start][state] =soft_count_trans[self.start][state]
+        #     for state in self.states:
+        #         self.transitions[self.start][state] =soft_count_trans[self.start][state]
             
-            print log_likelihood-prev_log_likelihood
+        #     epochs+=1
+        #     if epochs>iterations:
+        #         break
+        #     print "EM: epoch",epochs
+        #     print "EM: log_likelihood-prev_log_likelihood =",log_likelihood-prev_log_likelihood
 
-            if (log_likelihood - prev_log_likelihood) < convergence:
-                return log_likelihood
+        #     if (log_likelihood - prev_log_likelihood) < convergence:
+        #         return log_likelihood
 
-            prev_log_likelihood=log_likelihood
+        #     prev_log_likelihood=log_likelihood
 
-        return log_likelihood
+        # return log_likelihood
 
     # def post_processing(self):
-    # 	"""after an hmm has been trained, the probabilities of certain states
-    # 	must be adjusted (as per the Weiland paper)"""
+    #     """after an hmm has been trained, the probabilities of certain states
+    #     must be adjusted (as per the Weiland paper)"""
 
     def generate(self):
-    	"""after an hmm has been trained, use it to generate songs"""
-    	current=self.start
-    	emission_notes=[]
-      	current = hhmm.probabilistic_choice(self.transitions[current])
-      	emission_notes.append(hhmm.probabilistic_choice(self.emissions[current]))
-    	while True:
-      		current = hhmm.probabilistic_choice(self.transitions[current])
-    		if current.type==hhmm.EOF_STATE or current==self.start:
-    			break
-	      	emission_notes.append(hhmm.probabilistic_choice(self.emissions[current]))
+        """after an hmm has been trained, use it to generate songs
+        REWRITE THIS"""
+        current=self.start
+        emission_notes=[]
+        current = hhmm.probabilistic_choice(self.transitions[current])
+        emission_notes.append(hhmm.probabilistic_choice(self.emissions[current]))
+        while True:
+            current = hhmm.probabilistic_choice(self.transitions[current])
+            if current.type==hhmm.EOF_STATE or current==self.start:
+                break
+            emission_notes.append(hhmm.probabilistic_choice(self.emissions[current]))
 
-    	hhmm.write_midi(emission_notes)
+        hhmm.write_midi(emission_notes)
 
 if __name__=='__main__':
-	hierarchicalHMM = hhmm.HHMM()
+    print "making hierarchicalHMM..."
+    hierarchicalHMM = hhmm.HHMM()
 
-	# create sub-states for beginning, middle, and end,
-	# create production states for each note
-	parent = hierarchicalHMM.root
-	for i in xrange(3):
-		new_child = hierarchicalHMM.create_child(parent)
-		for note in hhmm.notes:
-			hierarchicalHMM.create_child(new_child, internal=False, note=note)
-		hhmm.normalize(new_child.vertical_transitions)
+    # # create sub-states for beginning, middle, and end,
+    # # create production states for each note
+    parent = hierarchicalHMM.root
+    # for i in xrange(3):
+    #     new_child = hierarchicalHMM.create_child(parent)
+    #     for note in hhmm.notes:
+    #         hierarchicalHMM.create_child(new_child, internal=False, note=note)
+    #     hhmm.normalize(new_child.vertical_transitions)
 
-	hhmm.normalize(parent.vertical_transitions)
-	hierarchicalHMM.initialize_horizontal_probs(parent)
+    # hhmm.normalize(parent.vertical_transitions)
+    # hierarchicalHMM.initialize_horizontal_probs(parent)
 
-	# testing self referential loop stuff
-	for internal_node in parent.vertical_transitions:
-		if internal_node.type==hhmm.INTERNAL_STATE:
-			sr=hierarchicalHMM.is_SR(internal_node)
-			if sr:
-				# print internal_node.horizontal_transitions, "\n\n"
-				hierarchicalHMM.convert_to_minSR(internal_node)
+    # create sub-states for beginning, middle, and end,
+    # create production states for each note
 
-	hierarchicalHMM.flatten()
-	hmm = HMM(hierarchicalHMM, 'bach_chorales_a4.data')
-	# x=hmm.best_state_sequence(hmm.observations[340])
-	# y=hmm.total_probability(hmm.observations[329])
-	# z=hmm.total_probability_bk(hmm.observations[329])
-	alpha=hmm.expectation_maximization(hmm.observations[:10],convergence=0.1)
-	for i in xrange(4):
-		hmm.generate()
-	pdb.set_trace()
+    for i in ['beginning', 'middle', 'end']:
+        new_child = hierarchicalHMM.create_child(parent, name=i)
+        for note in hhmm.notes:
+            hierarchicalHMM.create_child(new_child, internal=False, note=note)
+        hierarchicalHMM.initialize_horizontal_probs(new_child)
+        hhmm.normalize(new_child.vertical_transitions)
+
+    hierarchicalHMM.initialize_horizontal_probs(parent)
+    hhmm.normalize(parent.vertical_transitions)
+
+    beginning_node=hierarchicalHMM.node_dict['beginning']
+    middle_node=hierarchicalHMM.node_dict['middle']
+    end_node=hierarchicalHMM.node_dict['end']
+    # change probabilities as follows: 
+
+    # P(root->beginning_node)=1
+    parent.vertical_transitions[beginning_node]=1
+    for node in parent.vertical_transitions:
+        if node==beginning_node:
+            continue
+        parent.vertical_transitions[node]=0
+
+    # P(beginning->middle)=1
+    beginning_node.horizontal_transitions[middle_node]=1
+    for node in beginning_node.horizontal_transitions:
+        if node==middle_node:
+            continue
+        beginning_node.horizontal_transitions[node]=0
+
+
+    # P(middle->middle)=0.7 (note this is just preliminary, and may change)
+    middle_node.horizontal_transitions[middle_node]=0.7
+    # P(middle->end)=0.3
+    middle_node.horizontal_transitions[end_node]=0.3
+    for node in middle_node.horizontal_transitions:
+        if node==middle_node or node==end_node:
+            continue
+        middle_node.horizontal_transitions[node]=0
+
+    # P(end->EOF)=1
+    eof_node=hierarchicalHMM.get_eof_state(end_node)
+    end_node.horizontal_transitions[eof_node]=1
+    for node in end_node.horizontal_transitions:
+        if node==eof_node:
+            continue
+        end_node.horizontal_transitions[node]=0
+
+    # within each of [beginning, middle, end], p(internalstate->'(')=1
+    # i.e., each phrase must begin with a start-of-phrase symbol
+    # P(')'->EOF)=1
+    for i in [beginning_node, middle_node, end_node]:
+        for pstate in hierarchicalHMM.get_pstates(i):
+            if pstate.note=='(':
+                i.vertical_transitions[pstate]=1
+                for node in i.vertical_transitions:
+                    if node!=pstate:
+                        i.vertical_transitions[node]=0
+            elif pstate.note==')':
+                eof_node=hierarchicalHMM.get_eof_state(pstate)
+                pstate.horizontal_transitions[eof_node]=1
+                for node in pstate.horizontal_transitions:
+                    if node!=eof_node:
+                        pstate.horizontal_transitions[node]=0
+
+    # testing self referential loop stuff
+    for internal_node in parent.vertical_transitions:
+        if internal_node.type==hhmm.INTERNAL_STATE:
+            sr=hierarchicalHMM.is_SR(internal_node)
+            if sr:
+                # print internal_node.horizontal_transitions, "\n\n"
+                hierarchicalHMM.convert_to_minSR(internal_node)
+
+    print "flattening hierarchicalHMM..."
+    hierarchicalHMM.flatten()
+    for i in hierarchicalHMM.root.vertical_transitions:
+        if hierarchicalHMM.root.vertical_transitions[i]==1:
+            print i.note
+    pdb.set_trace()
+
+    print "converting flattened hierarchicalHMM to normal hmm..."
+    hmm = HMM(hierarchicalHMM, 'bach_chorales_cmajor_aminor_midi.data')
+    # x=hmm.best_state_sequence(hmm.observations[340])
+    # y=hmm.total_probability(hmm.observations[329])
+    # z=hmm.total_probability_bk(hmm.observations[329])
+    print "beginning expectation maximization..."
+    alpha=hmm.expectation_maximization(hmm.observations[:3],convergence=0.1, iterations=200)
+    for i in xrange(4):
+        hmm.generate()
