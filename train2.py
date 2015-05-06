@@ -347,7 +347,7 @@ class HMM:
                         q.append(child)
             return ps
         elif hierarchical_node.type==hhmm.PRODUCTION_STATE:
-            return hierarchical_node
+            return [hierarchical_node]
 
     def all_nodes_from_hhmm(self):
         """ retrieves all non-eof nodes from the hhmm. """
@@ -402,26 +402,40 @@ class HMM:
                 # gamma[t][i]: prob that node i was active at time t
                 gamma={} 
 
-                # compute gamma 
+                # compute gamma for production states in the hierarchical HMM by using
+                # corresponding alpha and beta values in the flat HMM
                 for t in range(len(observation.split())):
                     gamma[t]={}
                     for i in self.states:
+                        # the start state of the flat HMM has no hierarchical analogue, so skip it
+                        if i==self.start:
+                            continue
                         # beta[i] is indexed at time t+1 because the table is 1 longer than the alpha table
-                        gamma[t][self.corresponding_hierarchical_node[i]] = (alpha[i][t] * beta[i][t+1])/(10**prob_of_obs)
+                        # print "alpha[i].has_key(t)",alpha[i].has_key(t), 'beta[i].has_key(t+1)',beta[i].has_key(t+1)
+                        try:
+                            gamma[t][self.corresponding_hierarchical_node[i]] = (alpha[i][t] * beta[i][t+1])/(10**prob_of_obs)
+                        except KeyError as ke:
+                            pdb.set_trace()
 
                 # xi[t][i][j]: prob that at time t there was a transition from state i to state j
                 xi={} 
-
                 # compute xi
                 for t in range(len(observation.split())-1):
                     xi[t]={}
                     for i in self.states:
+
+                        if i==self.start:
+                            continue
                         xi[t][self.corresponding_hierarchical_node[i]]={}
+
                         for j in self.states:
+                            if j==self.start:
+                                continue
                             try:
                                 xi[t][self.corresponding_hierarchical_node[i]][self.corresponding_hierarchical_node[j]] = (alpha[i][t] * self.transitions[i][j]  * self.emissions[j][observation.split()[t+1]] * beta[i][t+2])/(10**prob_of_obs)
                             except (KeyError,IndexError) as ke: 
                                 pdb.set_trace()
+
 
                 # calculate gamma for internal states 
                 for t in range(len(observation.split())-1):
@@ -437,11 +451,12 @@ class HMM:
                         for k in not_set_of_i:
                             for l in set_of_i:
                                 gamma_sum+=xi[t][k][l]
-                    gamma[t][i]=gamma_sum
+                        gamma[t][i]=gamma_sum
                     
 
                 # now re-estimate Tij between all nodes i and j that are not end states
 
+                print "GOT TO TIJ RE_ESTIMATION"
                 for i in allnodes:
                     xi_sum_at_each_t=0
                     gamma_sum_at_each_t=0
@@ -450,12 +465,15 @@ class HMM:
 
                     for j in allnodes:
                         for t in range(len(observation.split())-2):
-                            sigma_i=set(self.sigma(i))
-                            sigma_j=set(self.sigma(j))
+                            try:
+                                sigma_i=set(self.sigma(i))
+                                sigma_j=set(self.sigma(j))
+                            except TypeError as te:
+                                pdb.set_trace()
                             for k in sigma_i:
                                 for l in sigma_j:
                                     xi_sum_at_each_t+=xi[t][k][l]
-
+                        # RuntimeWarning: invalid value encountered in double_scalars
                         trans_counts[i][j]+=xi_sum_at_each_t/gamma_sum_at_each_t
 
 
@@ -768,7 +786,7 @@ if __name__=='__main__':
     #         print i.note
 
     print "converting flattened hierarchicalHMM to normal hmm..."
-    hmm = HMM(hierarchicalHMM, 'bach_chorales_cmajor_aminor_midi.data')
+    hmm = HMM(hierarchicalHMM, 'temp.data')
 
     # import sys
     # # hhmm.write_midi(hierarchicalHMM.traverse(hierarchicalHMM.root))
