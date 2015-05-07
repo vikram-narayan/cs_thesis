@@ -1,0 +1,22 @@
+hhmm.check_probs(parent.vertical_transitions);hhmm.check_probs(end_node.vertical_transitions);hhmm.check_probs(middle_node.vertical_transitions);hhmm.check_probs(beginning_node.vertical_transitions);hhmm.check_probs(beginning_node.horizontal_transitions);hhmm.check_probs(middle_node.horizontal_transitions);hhmm.check_probs(end_node.horizontal_transitions);
+
+
+hierarchicalHMM.check_probs(parent.vertical_transitions);hierarchicalHMM.check_probs(end_node.vertical_transitions);hierarchicalHMM.check_probs(middle_node.vertical_transitions);hierarchicalHMM.check_probs(beginning_node.vertical_transitions);hierarchicalHMM.check_probs(beginning_node.horizontal_transitions);hierarchicalHMM.check_probs(middle_node.horizontal_transitions);hierarchicalHMM.check_probs(end_node.horizontal_transitions);
+
+
+
+[sum(i.horizontal_transitions.values()) for i in hierarchicalHMM.get_pstates(end_node)]
+
+[sum(hmm.transitions[hmm.states.keys()[i]].values()) for i in range(len(hmm.states.keys()))]
+
+
+[sum(self.transitions[i].values()) for i in self.states]
+
+
+
+[len(self.transitions[j]) for j in self.states]
+
+[xi[t][i].values() for i in xi[t]]
+[sum(xi[t][i].values()) for i in xi[t]]
+
+                                                                                                                     

@@ -375,9 +375,10 @@ class HMM:
         of the corpus under the final updated parameters."""
         prev_log_likelihood=-float('inf')
         epochs=0
+        print "EM: starting expectation maximization..."
         while (True):
             log_likelihood=0
-            print "expectation_maximization: epochs:",epochs
+            print "EM: epochs:",epochs
 
             trans_counts={}
             pi={}
@@ -392,11 +393,11 @@ class HMM:
 
             allnodes=self.all_nodes_from_hhmm()
             for observation in corpus:
-                print "expectation_maximization: observation:",observation
+                print "EM: observation:",observation
                 alpha = self.forward_algorithm(observation.split())
                 beta = self.backward_algorithm(observation.split())
                 prob_of_obs = self.total_probability(observation)
-                print "expectation_maximization: sanity check that alpha==beta:",prob_of_obs==self.total_probability_bk(observation)
+                print "EM: sanity check that alpha==beta:",prob_of_obs==self.total_probability_bk(observation)
 
 
                 # gamma[t][i]: prob that node i was active at time t
@@ -420,7 +421,7 @@ class HMM:
                 # xi[t][i][j]: prob that at time t there was a transition from state i to state j
                 xi={} 
                 # compute xi
-                for t in range(len(observation.split())-1):
+                for t in range(len(observation.split())-2):
                     xi[t]={}
                     for i in self.states:
 
@@ -432,9 +433,23 @@ class HMM:
                             if j==self.start:
                                 continue
                             try:
+                                # print "alpha[i][t]", alpha[i][t] 
+                                # print "beta[i][t+2]",beta[i][t+2]
+                                print "self.emissions[i][j]",sum(self.emissions[i].values())
+                                # print "self.emissions[j][observation.split()[t+1]]",self.emissions[j][observation.split()[t+1]]
                                 xi[t][self.corresponding_hierarchical_node[i]][self.corresponding_hierarchical_node[j]] = (alpha[i][t] * self.transitions[i][j]  * self.emissions[j][observation.split()[t+1]] * beta[i][t+2])/(10**prob_of_obs)
                             except (KeyError,IndexError) as ke: 
                                 pdb.set_trace()
+
+                print "EM: xi and gamma filled out for production states."
+                for t in range(len(observation.split())):
+                    print "EM: sanity check: gamma sums to:", sum(gamma[t].values())
+                    # print gamma[t].values()
+
+                for t in range(len(observation.split())):
+                    for blah in xi[t]:
+                        print "xi[t] sums to:", sum(xi[t][blah].values())
+
 
 
                 # calculate gamma for internal states 

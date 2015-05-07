@@ -1,0 +1,30 @@
+
+    def forward_algorithm(self, observation):
+        """given an observation as a list of symbols,
+        run the forward algorithm"""
+        
+        # initialize forward algorithm table
+        fwd_table={}
+        fwd_table['scaling factor']=[]
+        for i in range(len(observation)):
+            fwd_table['scaling factor'].append(0)
+
+        for state in self.states:
+            fwd_table[state]=[]
+            for i in range(len(observation)):
+                fwd_table[state].append(0)
+
+        # initialize first col of fwd algorithm table
+        for state in self.states:
+            # logs will be taken at the end 
+            fwd_table[state][0] = (self.transitions[self.start][state] * self.emissions[state][observation[0]] ) 
+
+        # fill in the rest of the forward table
+        for output in range(1,len(observation)):
+            for state in self.states:
+                fwd=0
+                for prev_state in self.states:
+                    fwd+=fwd_table[prev_state][output-1] * self.transitions[prev_state][state] * self.emissions[state][observation[output]]
+                fwd_table[state][output] = fwd
+
+        return fwd_table
