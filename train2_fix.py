@@ -80,8 +80,6 @@ class HMM:
         #         break
 
 
-
-
         # copy values from i.horizontal_transitions
         for i in production_states:
                 i_flat = self.corresponding_flat_node[i]
@@ -607,11 +605,11 @@ class HMM:
             print "expectation_maximization: prev_log_likelihood-log_likelihood:", prev_log_likelihood-log_likelihood
 
             epochs+=1
-            if (epochs>iterations) or (abs(prev_log_likelihood-log_likelihood) < convergence):
+            if (epochs>iterations):# or (abs(prev_log_likelihood-log_likelihood) < convergence):
                 break
 
             prev_log_likelihood=log_likelihood
-
+        pdb.set_trace()
         return log_likelihood
         #     # store emission soft counts
         #     soft_count={}
@@ -823,6 +821,6 @@ if __name__=='__main__':
     hmm = HMM(hierarchicalHMM, 'toy.data')
 
     print "beginning expectation maximization..."
-    alpha=hmm.expectation_maximization(hmm.observations[:3],convergence=0.1, iterations=200)
+    alpha=hmm.expectation_maximization(hmm.observations[:3],convergence=0.1, iterations=50)
     for i in xrange(4):
         hmm.generate()
