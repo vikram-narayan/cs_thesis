@@ -18,7 +18,7 @@ EOF_STATE=2
 
 # make a dictionary of all possible notes 
 notes={}
-f=open('bach_chorales_cmajor_aminor_midi.data')
+f=open('temp.data')
 f2=f.read().split()
 for item in f2:
 	if item=='\n':
@@ -60,8 +60,9 @@ def write_midi(sequence, note_type='quarter'):
 	# currently we default to a 4/4 time sig, this may change in the future
 	four_by_four = music21.meter.TimeSignature('4/4')
 	stream_notes.append(four_by_four)
-	for letter in sequence:
-		if letter==')' or letter=='fermata':
+	for index,letter in enumerate(sequence):
+		if letter==')' or letter=='fermata' or letter=='(':
+			continue
 			n = music21.note.Note(type='whole')
 			n.pitch.midi = int(letter)
 			stream_notes.append(n)
@@ -246,7 +247,7 @@ class HHMM:
 		"""
 		Assumes the node has an EOF_STATE node in its horizontal_transitions dictionary 
 		"""
-		for brother in node.horizontal_transitions:
+		for brother in node.parent.vertical_transitions:
 			if brother.type==EOF_STATE:
 				return brother
 
@@ -441,7 +442,6 @@ if __name__ == "__main__":
 				print internal_node.type
 
 	hhmm.flatten()
-	pdb.set_trace()
 	# write_flattenedHHMM_tofile(hhmm,'hhmm_flattened')
 	# print "STARTING TRAVERSAL"
 	# emissions=hhmm.traverse(hhmm.root)

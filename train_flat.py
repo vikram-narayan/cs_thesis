@@ -674,13 +674,13 @@ if __name__=='__main__':
 
 
     print "training beginning hmm..."
-    alpha=beginning.expectation_maximization(beginning.observations[:50],convergence=0.0001, iterations=200)
+    alpha=beginning.expectation_maximization(beginning.observations[:50],convergence=0.01, iterations=200)
 
     print "training middle hmm..."
-    alpha=middle.expectation_maximization(middle.observations[:50],convergence=0.0001, iterations=200)
+    alpha=middle.expectation_maximization(middle.observations[:50],convergence=0.01, iterations=200)
 
     print "training end hmm..."
-    alpha=end.expectation_maximization(end.observations[:50],convergence=0.0001, iterations=200)
+    alpha=end.expectation_maximization(end.observations[:50],convergence=0.01, iterations=200)
 
     # alpha=hmm.expectation_maximization_scale(hmm.observations[:3],convergence=0.1, iterations=200)
 
@@ -694,7 +694,7 @@ if __name__=='__main__':
                 break
             max_middle+=1
         emission_seq += end.generate()
-
+        pdb.set_trace()
         hhmm.write_midi(emission_seq)
 
     # for i in xrange(4):
