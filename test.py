@@ -13,7 +13,6 @@ c = converter.parse('tinynotation: 4/4 c4 d e f')
 c.show('text')
 fp = converter.freeze(c, fmt='pickle')
 print fp
-"""
 data1 = [('g4', 'quarter'), ('a4', 'quarter'), ('b4', 'quarter'), ('c#5', 'quarter')]
 data2 = [('d5', 'whole')]
 data = [data1, data2]
@@ -38,4 +37,7 @@ print type(partUpper)
 partUpper.flat.transpose('a4').show()
 
 partUpper.show()
+"""
+for x in corpus.chorales.Iterator():
+    
 

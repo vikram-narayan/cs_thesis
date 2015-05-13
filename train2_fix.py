@@ -379,10 +379,20 @@ class HMM:
             end_trans={}
             for i in allnodes:
                 trans_counts[i]={}
-                pi[i]={}
                 end_trans[i]=0
-                for j in allnodes:
+                for j in i.horizontal_transitions:
+                    if j.type==hhmm.EOF_STATE:
+                        continue
                     trans_counts[i][j]=0
+
+            for i in allnodes:
+                if i.type!=hhmm.INTERNAL_STATE:
+                    continue
+                pi[i]={}
+                for j in i.vertical_transitions:
+                    if j.type==hhmm.EOF_STATE:
+                        continue
+
                     pi[i][j]=0
 
             for observation in corpus:
@@ -471,7 +481,9 @@ class HMM:
                     for t in range(len(observation.split())-2):
                         gamma_sum_at_each_t+=gamma[t][i]
 
-                    for j in allnodes:
+                    for j in i.horizontal_transitions:
+                        if j.type==hhmm.EOF_STATE:
+                            continue
                         for t in range(len(observation.split())-2):
                             try:
                                 sigma_i=set(self.sigma(i))
@@ -483,12 +495,19 @@ class HMM:
                                     xi_sum_at_each_t+=xi[t][k][l]
                         # RuntimeWarning: invalid value encountered in double_scalars
                         if gamma_sum_at_each_t > numpy.finfo(float).eps:
-                            trans_counts[i][j]+=xi_sum_at_each_t/gamma_sum_at_each_t
+                            try:
+                                trans_counts[i][j]+=xi_sum_at_each_t/gamma_sum_at_each_t
+                            except KeyError as ke:
+                                pdb.set_trace()
 
 
                 # fill pi[i][j] to estimate hierarchical transitions
                 for i in allnodes:
-                    for j in allnodes:
+                    if i.type!=hhmm.INTERNAL_STATE:
+                        continue
+                    for j in i.vertical_transitions:
+                        if j.type==hhmm.EOF_STATE:
+                            continue
                         sigma_j = set(self.sigma(j))
                         sigma_i=set(self.sigma(i))
                         not_sigma_i=set(self.sigma(self.hierarchicalHMM.root)) - set_of_i
@@ -549,17 +568,39 @@ class HMM:
                     continue
                 hhmm.normalize(trans_counts[i])
             for i in pi:
-                hhmm.normalize(pi[i])
+                try:
+                    hhmm.normalize(pi[i])
+                except ZeroDivisionError as e:
+                    pdb.set_trace()
+
 
             # transfer values from trans_counts and pi to the hhmm
-            # for i in allnodes:
-            #     for j in pi[i]:
-            #         pdb.set_trace()
-            #         i.vertical_transitions[j] = pi[i][j]
+            for i in allnodes:
+                if i.type!=hhmm.INTERNAL_STATE:
+                    continue
+                for j in i.vertical_transitions:
+                    if j.type==hhmm.EOF_STATE:
+                        continue
+                    i.vertical_transitions[j] = pi[i][j]
 
+
+
+
+            for i in allnodes:
+                for j in i.horizontal_transitions:
+                    if j.type==hhmm.EOF_STATE:
+                        continue
+                    i.horizontal_transitions[j] = trans_counts[i][j]
+            # for i in allnodes:
+
+            #     try:
+            #         for j in pi[i]:
+            #             i.vertical_transitions[j] = pi[i][j]
+            #     except KeyError as e:
+            #         pdb.set_trace()
             #     # if i==root, only copy the new vertical transitions
-            #     if i==self.hierarchicalHMM.root:
-            #         continue                   
+            #     # if i==self.hierarchicalHMM.root:
+            #     #     continue                   
             #     for j in trans_counts[i]:
             #         i.horizontal_transitions[j] = trans_counts[i][j]
 

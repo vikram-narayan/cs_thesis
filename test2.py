@@ -1,26 +1,38 @@
 import pdb
-f=open('bach_chorales_cmajor_aminor_midi.data','r')
-l=[]
+f=open('temp.data','r')
+beginning=[]
+middle=[]
+end=[]
 i=0
-print "[ ",
-maxlen=10
 for line in f:
-
-    line=line.split()
-    if len(line) < maxlen:
-        continue
-
-    for j in xrange(maxlen):
-        if line[j]=='(' or line[j]==')' or line[j]=='fermata':
-            print '1', ' ',
-            continue
-        print line[j], " ",
-    print ";",
-    i+=1
-    if i > 24:
-        break
-print "]"
+    line=line[:len(line)-1]
+    line=line.split(') (')
+    if len(line)==1:
+        line=line[:len(line)-1]
+    for index,phrase in enumerate(line):
+        if index==0:
+            beginning.append(phrase)
+        elif index==len(line)-1:
+            end.append(phrase)
+        else:
+            middle.append(phrase)
+    # print  len(beginning[i]) + len(middle[i]) + len(end[i]) == len(line)
 f.close()
 
-# x=numpy.array(l)
-# mmat(x)
+b=open('beginning.data','w')
+for p in beginning:
+    b.write(p+')')
+    b.write('\n')
+b.close()
+
+b=open('middle.data','w')
+for p in middle:
+    b.write('('+p+')')
+    b.write('\n')
+b.close()
+
+b=open('end.data','w')
+for p in end:
+    b.write('('+p)
+    b.write('\n')
+b.close()
