@@ -210,21 +210,21 @@ class HHMM:
 		current_node=self.root
 		while True:
 			# time.sleep(1)
-			print "Current node:", current_node
-			print "Node depth:", current_node.depth
+			# print "Current node:", current_node
+			# print "Node depth:", current_node.depth
 			types={0:"production state", 1:"internal state", 2: "eof state"}
-			print "Node type:", types[current_node.type]
-			print "Parent node:", current_node.parent
-			print "Horizontal Transitions Size:", len(current_node.horizontal_transitions), "\n"
+			# print "Node type:", types[current_node.type]
+			# print "Parent node:", current_node.parent
+			# print "Horizontal Transitions Size:", len(current_node.horizontal_transitions), "\n"
 			if current_node.type==INTERNAL_STATE:
 				current_node = probabilistic_choice(current_node.vertical_transitions)
 			elif current_node.type==PRODUCTION_STATE:
 				emission=probabilistic_choice(current_node.emissions)
 				emission_string.append(emission)
-				print "EMISSION:", emission
+				# print "EMISSION:", emission
 				current_node = probabilistic_choice(current_node.horizontal_transitions)
 			else: # current_node has type EOF_STATE 
-				print "==============EOF_STATE Reached===================="
+				# print "==============EOF_STATE Reached===================="
 				current_node = current_node.parent
 				if current_node==self.root:
 					print emission_string

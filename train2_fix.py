@@ -665,9 +665,7 @@ class HMM:
     def generate(self):
         """after an hmm has been trained, use it to generate songs
         REWRITE THIS"""
-        import sys
-        print "QUITTING============--"
-        sys.quit(0)
+
         current=self.start
         emission_notes=[]
         current = hhmm.probabilistic_choice(self.transitions[current])
@@ -678,7 +676,8 @@ class HMM:
                 break
             emission_notes.append(hhmm.probabilistic_choice(self.emissions[current]))
 
-        hhmm.write_midi(emission_notes)
+        print emission_notes
+        # hhmm.write_midi(emission_notes)
 
 if __name__=='__main__':
     print "making hierarchicalHMM..."
@@ -772,4 +771,4 @@ if __name__=='__main__':
     print "beginning expectation maximization..."
     alpha=hmm.expectation_maximization(hmm.observations,convergence=0.0001, iterations=300)
     for i in xrange(4):
-        hmm.generate()
+        hmm.hierarchicalHMM.traverse(hmm.hierarchicalHMM.root)
