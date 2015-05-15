@@ -357,6 +357,50 @@ class HMM:
         return allnodes
 
 
+    def reflatten(self):
+
+        # make sure self.hierarchicalHMM is minimally self referential
+        for internal_node in self.hierarchicalHMM.root.vertical_transitions:
+            if internal_node.type==hhmm.INTERNAL_STATE:
+                sr=self.hierarchicalHMM.is_SR(internal_node)
+                if sr:
+                    # print internal_node.horizontal_transitions, "\n\n"
+                    self.hierarchicalHMM.convert_to_minSR(internal_node)
+
+        # reflatten the hierarchical HMM
+        for i in self.states:
+            if i==self.start or self.states[i]==0:
+                continue
+            else:
+                for j in self.states:
+                    if j==self.start:
+                        continue
+                    if self.corresponding_hierarchical_node[i].parent==self.corresponding_hierarchical_node[j].parent:
+                        continue
+                    i_to_end = self.corresponding_hierarchical_node[i].horizontal_transitions[self.hierarchicalHMM.get_eof_state(self.corresponding_hierarchical_node[i])]
+                    iparent_to_jparent = self.corresponding_hierarchical_node[i].parent.horizontal_transitions[self.corresponding_hierarchical_node[j].parent]
+                    jparent_to_j = self.corresponding_hierarchical_node[j].parent.vertical_transitions[self.corresponding_hierarchical_node[j]]
+                    self.transitions[i][j] = i_to_end * iparent_to_jparent * jparent_to_j
+
+
+        # vertical transition probabilities transformed into initial activation probabilities
+        # by computing the product of vertical probs from root state to production state
+        production_states=self.hierarchicalHMM.get_pstates(self.hierarchicalHMM.root)
+
+        self.transitions[self.start]={}
+        self.transitions[self.start][self.start]=0
+        for i in production_states:
+            i_flat = self.corresponding_flat_node[i]
+            self.transitions[self.start][i_flat]=hierarchicalHMM.ps_to_root(i,1)
+            self.transitions[i_flat][self.start]=0
+            # self.root.vertical_transitions[i] = self.ps_to_root(i,1)
+
+
+        for t in self.transitions:
+            hhmm.normalize(self.transitions[t])
+
+        # pdb.set_trace()
+
 
     def expectation_maximization(self, corpus, convergence, iterations):
         """given a corpus, which is a list of observations, and
@@ -370,7 +414,7 @@ class HMM:
         print "EM: starting expectation maximization..."
         while (True):
             log_likelihood=0
-            print "EM: epochs:",epochs
+            print "EM: epoch:",epochs
 
             trans_counts={}
             pi={}
@@ -394,16 +438,17 @@ class HMM:
                     pi[i][j]=0
 
             for observation in corpus:
-                print "EM: observation:",observation
+                # print "EM: observation:",observation
                 alpha = self.forward_algorithm(observation.split())
                 beta = self.backward_algorithm(observation.split())
                 prob_of_obs = self.total_probability(observation)
-                print "EM: sanity check that alpha==beta:",prob_of_obs==self.total_probability_bk(observation)
+                log_likelihood+=prob_of_obs
+                # print "EM: sanity check that alpha==beta:",prob_of_obs==self.total_probability_bk(observation)
 
 
                 # gamma[t][i]: prob that node i was active at time t
                 gamma={} 
-                print 'STARTED GAMMA'
+                # print 'STARTED GAMMA'
                 # compute gamma for production states in the hierarchical HMM by using
                 # corresponding alpha and beta values in the flat HMM
                 for t in range(len(observation.split())):
@@ -418,7 +463,7 @@ class HMM:
                             gamma[t][self.corresponding_hierarchical_node[i]] = (alpha[i][t] * beta[i][t+1])/(10**prob_of_obs)
                         except KeyError as ke:
                             pdb.set_trace()
-                print "FINISHED GAMMA "
+                # print "FINISHED GAMMA "
                 # xi[t][i][j]: prob that at time t there was a transition from state i to state j
                 xi={} 
                 # compute xi
@@ -441,7 +486,7 @@ class HMM:
                                 xi[t][self.corresponding_hierarchical_node[i]][self.corresponding_hierarchical_node[j]] = (alpha[i][t] * self.transitions[i][j]  * self.emissions[j][observation.split()[t+1]] * beta[i][t+2])/(10**prob_of_obs)
                             except (KeyError,IndexError) as ke: 
                                 pdb.set_trace()
-                print "FINISHED XI"
+                # print "FINISHED XI"
                 # print "EM: xi and gamma filled out for production states."
                 # for t in xrange(len(observation.split())):
                 #     print "EM: sanity check: gamma sums to:", sum(gamma[t].values())
@@ -472,7 +517,7 @@ class HMM:
 
                 # now re-estimate Tij between all nodes i and j that are not end states
 
-                print "GOT TO TIJ RE_ESTIMATION"
+                # print "GOT TO TIJ RE_ESTIMATION"
                 for i in allnodes:
                     xi_sum_at_each_t=0
                     gamma_sum_at_each_t=0
@@ -602,118 +647,19 @@ class HMM:
             #     for j in trans_counts[i]:
             #         i.horizontal_transitions[j] = trans_counts[i][j]
 
-            print "expectation_maximization: prev_log_likelihood-log_likelihood:", prev_log_likelihood-log_likelihood
+            print "EM: prev_log_likelihood-log_likelihood:", prev_log_likelihood-log_likelihood
 
             epochs+=1
-            if (epochs>iterations):# or (abs(prev_log_likelihood-log_likelihood) < convergence):
+            if (epochs>iterations) or (abs(prev_log_likelihood-log_likelihood) < convergence):
                 break
 
             prev_log_likelihood=log_likelihood
+            # print "EM: log_likelihood", log_likelihood
+
+
+            self.reflatten()
         pdb.set_trace()
         return log_likelihood
-        #     # store emission soft counts
-        #     soft_count={}
-        #     for state in self.states:
-        #         soft_count[state]={}
-        #         for i in hhmm.notes:
-        #             soft_count[state][i]=0
-
-        #     # store soft counts for transitions
-        #     soft_count_trans={}
-        #     soft_count_trans[self.start]={}
-        #     for state in self.states:
-        #         soft_count_trans[state]={}
-        #         soft_count_trans[self.start][state]=0
-        #         for state2 in self.states:
-        #             soft_count_trans[state][state2]=0
-
-        #     for observation in corpus:
-        #         total_prob = self.total_probability(observation)
-        #         log_likelihood+=total_prob
-        #         fwd_matrix = self.forward_algorithm(observation.split())
-        #         bk_matrix = self.backward_algorithm(observation.split())
-        #         print "total_prob =",total_prob
-        #         # new_emissions stores the counts for observation
-        #         new_emissions = {}
-        #         # new_transitions={}
-
-        #         for state in self.states:
-        #             new_emissions[state]=[]
-        #             for i in range(len(observation.split())):
-        #                 new_emissions[state].append(0)
-        #         # emission soft counts
-        #         for i in range(len(observation.split())):
-        #             for state in self.states:
-        #                 new_emissions[state][i] = fwd_matrix[state][i] * bk_matrix[state][i+1] 
-        #                 new_emissions[state][i] = new_emissions[state][i]/(10**total_prob)
-        #                 if soft_count[state].has_key(observation.split()[i]):
-        #                     soft_count[state][observation.split()[i]]+=new_emissions[state][i]
-        #                 else:
-        #                     soft_count[state][observation.split()[i]]=new_emissions[state][i]
-
-        #         # transition soft counts
-        #         for i in range(len(observation.split())-1):
-        #             for state in self.states:
-        #                 for state2 in self.states:
-        #                     soft_count_trans[state][state2]+=(fwd_matrix[state][i] * self.transitions[state][state2] * self.emissions[state2][observation.split()[i+1]] * bk_matrix[state2][i+2])/(10**total_prob)
-
-        #         # update transition probabilities from start
-        #         for state in self.states:
-        #             soft_count_trans[self.start][state]+= (self.transitions[self.start][state] * self.emissions[state][observation.split()[0]]* bk_matrix[state][1])/(10**total_prob) 
-        #         # bss = self.best_state_sequence(observation)
-        #         # for state in self.states:
-        #         #     # if bss[0]==state:
-        #         #     soft_count_trans[self.start][state]+=total_prob * self.emissions[state][observation[0]]
-
-        #     #normalize emission soft counts
-        #     for state in self.states:
-        #         running_sum=0
-        #         for letter in soft_count[state]:
-        #             running_sum+=soft_count[state][letter]
-        #         for letter in soft_count[state]:
-        #             soft_count[state][letter] =soft_count[state][letter]/running_sum
-
-
-        # #     #update emission probabilities
-        # #     for state in self.states:
-        # #         for letter in soft_count[state]:
-        # #             if soft_count[state][letter]!=0:
-        # #                 self.emissions[state][letter] = soft_count[state][letter]
-
-        # #     #normalize transition soft counts
-        # #     for state in self.states:
-        # #         running_sum=0
-        # #         for state2 in self.states:
-        # #             running_sum+= soft_count_trans[state][state2]
-        # #         for state2 in self.states:
-        # #             soft_count_trans[state][state2] = soft_count_trans[state][state2]/running_sum
-
-        # #     running_sum=0
-        # #     for state in self.states:
-        # #         running_sum+=soft_count_trans[self.start][state]
-        # #     for state in self.states:
-        # #         soft_count_trans[self.start][state] = soft_count_trans[self.start][state]/running_sum
-            
-        # #     #update transition probabilities
-        # #     for state in self.states:
-        # #         for state2 in self.states:
-        # #             self.transitions[state][state2] = soft_count_trans[state][state2]
-
-        # #     for state in self.states:
-        # #         self.transitions[self.start][state] =soft_count_trans[self.start][state]
-            
-        # #     epochs+=1
-        # #     if epochs>iterations:
-        # #         break
-        # #     print "EM: epoch",epochs
-        # #     print "EM: log_likelihood-prev_log_likelihood =",log_likelihood-prev_log_likelihood
-
-        # #     if (log_likelihood - prev_log_likelihood) < convergence:
-        # #         return log_likelihood
-
-        #     prev_log_likelihood=log_likelihood
-
-        # return log_likelihood
 
 
     def generate(self):
@@ -820,7 +766,10 @@ if __name__=='__main__':
     print "converting flattened hierarchicalHMM to normal hmm..."
     hmm = HMM(hierarchicalHMM, 'toy.data')
 
+    
+
+
     print "beginning expectation maximization..."
-    alpha=hmm.expectation_maximization(hmm.observations[:3],convergence=0.1, iterations=50)
+    alpha=hmm.expectation_maximization(hmm.observations,convergence=0.0001, iterations=300)
     for i in xrange(4):
         hmm.generate()
