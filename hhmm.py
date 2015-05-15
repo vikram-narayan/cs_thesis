@@ -229,6 +229,7 @@ class HHMM:
 				if current_node==self.root:
 					print emission_string
 					return emission_string
+					
 				else:
 					current_node = probabilistic_choice(current_node.horizontal_transitions)
 
