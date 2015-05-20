@@ -400,7 +400,7 @@ class HMM:
         for t in self.transitions:
             hhmm.normalize(self.transitions[t])
 
-        # pdb.set_trace()
+        # pdb.set_trace()        
 
 
     def expectation_maximization(self, corpus, convergence, iterations):
@@ -424,8 +424,8 @@ class HMM:
                 trans_counts[i]={}
                 end_trans[i]=0
                 for j in i.horizontal_transitions:
-                    if j.type==hhmm.EOF_STATE:
-                        continue
+                    # if j.type==hhmm.EOF_STATE:
+                    #     continue
                     trans_counts[i][j]=0
 
             for i in allnodes:
@@ -453,7 +453,6 @@ class HMM:
 
                 # gamma[t][i]: prob that node i was active at time t
                 gamma={} 
-                # print 'STARTED GAMMA'
                 # compute gamma for production states in the hierarchical HMM by using
                 # corresponding alpha and beta values in the flat HMM
                 for t in range(len(observation.split())):
@@ -473,7 +472,6 @@ class HMM:
                 for t in range(len(observation.split())):
                     hhmm.normalize(gamma[t])
 
-                # print "FINISHED GAMMA "
                 # xi[t][i][j]: prob that at time t there was a transition from state i to state j
                 xi={} 
                 # compute xi
@@ -494,135 +492,165 @@ class HMM:
                                 # print "self.emissions[i][j]",sum(self.emissions[i].values())
                                 # print "self.emissions[j][observation.split()[t+1]]",self.emissions[j][observation.split()[t+1]]
                                 xi[t][self.corresponding_hierarchical_node[i]][self.corresponding_hierarchical_node[j]] = (alpha[i][t] * self.transitions[i][j]  * self.emissions[j][observation.split()[t+1]] * beta[i][t+2])/(10**prob_of_obs)
+                                if self.corresponding_hierarchical_node[i].parent!=self.corresponding_hierarchical_node[j].parent:
+                                    trans_counts[self.corresponding_hierarchical_node[i]][self.hierarchicalHMM.get_eof_state(self.corresponding_hierarchical_node[i])] += (alpha[i][t] * self.transitions[i][j]  * self.emissions[j][observation.split()[t+1]] * beta[i][t+2])/(10**prob_of_obs)
+                                else:
+                                    trans_counts[self.corresponding_hierarchical_node[i]][self.corresponding_hierarchical_node[j]] += (alpha[i][t] * self.transitions[i][j]  * self.emissions[j][observation.split()[t+1]] * beta[i][t+2])/(10**prob_of_obs)
                             except (KeyError,IndexError) as ke: 
                                 pdb.set_trace()
 
 
                 # normalize xi values 
-                for t in range(len(observation.split())-1):
-                    for i in xi[t]:
-                        hhmm.normalize(xi[t][i])
-                # print "FINISHED XI"
-                # print "EM: xi and gamma filled out for production states."
-                # for t in xrange(len(observation.split())):
-                #     print "EM: sanity check: gamma sums to:", sum(gamma[t].values())
-                #     # print gamma[t].values()
+                # for t in range(len(observation.split())-1):
+                #     for i in xi[t]:
+                #         hhmm.normalize(xi[t][i])
 
-                # for t in xrange(len(observation.split())-1):
-                #     print t
-                #     for state in xi[t]:
-                #         print "xi[t] sums to:", sum(xi[t][state].values())
-
-                # calculate gamma for internal states 
-                for t in range(len(observation.split())-1):
-
-                    gamma_sum=0
+                # gamma for internal states
+                for t in range(len(observation.split())):
                     for i in allnodes:
-
                         # skip production states and eof states
                         if i.type!=hhmm.INTERNAL_STATE:
                             continue
-
+                        gamma[t][i] = 0
                         set_of_i=set(self.sigma(i))
-                        not_set_of_i=set(self.sigma(self.hierarchicalHMM.root)) - set_of_i
-                        for k in not_set_of_i:
-                            for l in set_of_i:
-                                gamma_sum+=xi[t][k][l]
-                        gamma[t][i]=gamma_sum
-                        # if i.type==hhmm.INTERNAL_STATE:
-                        #     pdb.set_trace()
-                    
+                        for l in set_of_i:
+                            gamma[t][i] += gamma[t][l]
+
+                # xi for internal states
+                for t in range(len(observation.split())-1):
+
+                    for i in allnodes:
+                        # skip production states and eof states
+                        if i.type!=hhmm.INTERNAL_STATE:
+                            continue 
+
+                        xi[t][i]={}
+
+                        for j in i.horizontal_transitions:
+                            xi[t][i][j]=0
+                            if i==j or j.type==hhmm.EOF_STATE:
+                                continue
+                            # if j.type==hhmm.EOF_STATE:
+                            #     set_of_i=set(self.sigma(i))
+                            #     xi[t][i][j] += gamma[t][i] * i.horizontal_transitions[j]
+                            #     trans_counts[i][j] += gamma[t][i] * i.horizontal_transitions[j]
+                            #     # for k in set_of_i:
+                            #     #     # probability of "emitting" an eof symbol is 1, so don't need to multply that
+                            #     #     xi[t][i][j]+=gamma[t][k]*k.horizontal_transitions[self.hierarchicalHMM.get_eof_state(k)]
+                            #     #     trans_counts[i][j]+=gamma[t][k]*k.horizontal_transitions[self.hierarchicalHMM.get_eof_state(k)]
+                            #     continue
+
+                            set_of_i=set(self.sigma(i))
+                            set_of_j=set(self.sigma(j))
+                            for k in set_of_i:
+                                for l in set_of_j:
+
+                                    xi[t][i][j]+=xi[t][k][l]
+                                    trans_counts[i][j] +=xi[t][k][l]
+                                    pi[l.parent][l] += xi[t][k][l]
+
+
+                for i in allnodes:
+                    if i.type==hhmm.INTERNAL_STATE and i!=self.hierarchicalHMM.root:
+                        try:
+
+                            # xi[len(observation.split())-1][i][self.hierarchicalHMM.get_eof_state(i)]=gamma[len(observation.split())-1][i] * i.horizontal_transitions[self.hierarchicalHMM.get_eof_state(i)]
+                            trans_counts[i][self.hierarchicalHMM.get_eof_state(i)]=gamma[len(observation.split())-1][i] * i.horizontal_transitions[self.hierarchicalHMM.get_eof_state(i)]
+                        except KeyError as e:
+                            pdb.set_trace()
+
                 # now re-estimate Tij between all nodes i and j that are not end states
 
-                # print "GOT TO TIJ RE_ESTIMATION"
-                for i in allnodes:
-                    xi_sum_at_each_t=0
-                    gamma_sum_at_each_t=0
-                    for t in range(len(observation.split())-2):
-                        gamma_sum_at_each_t+=gamma[t][i]
+                # for i in allnodes:
+                #     xi_sum_at_each_t=0
+                #     gamma_sum_at_each_t=0
+                #     for t in range(len(observation.split())-2):
+                #         gamma_sum_at_each_t+=gamma[t][i]
 
-                    for j in i.horizontal_transitions:
-                        if j.type==hhmm.EOF_STATE:
-                            continue
-                        for t in range(len(observation.split())-2):
-                            try:
-                                sigma_i=set(self.sigma(i))
-                                sigma_j=set(self.sigma(j))
-                            except TypeError as te:
-                                pdb.set_trace()
-                            for k in sigma_i:
-                                for l in sigma_j:
-                                    xi_sum_at_each_t+=xi[t][k][l]
-                        # RuntimeWarning: invalid value encountered in double_scalars
-                        if gamma_sum_at_each_t > numpy.finfo(float).eps:
-                            try:
-                                trans_counts[i][j]+=xi_sum_at_each_t/gamma_sum_at_each_t
-                            except KeyError as ke:
-                                pdb.set_trace()
+                #     for j in i.horizontal_transitions:
+                #         if j.type==hhmm.EOF_STATE:
+                #             continue
+                #         for t in range(len(observation.split())-2):
+                #             try:
+                #                 sigma_i=set(self.sigma(i))
+                #                 sigma_j=set(self.sigma(j))
+                #             except TypeError as te:
+                #                 pdb.set_trace()
+                #             for k in sigma_i:
+                #                 for l in sigma_j:
+                #                     xi_sum_at_each_t+=xi[t][k][l]
+                #         # RuntimeWarning: invalid value encountered in double_scalars
+                #         if gamma_sum_at_each_t > numpy.finfo(float).eps:
+                #             try:
+                #                 trans_counts[i][j]+=xi_sum_at_each_t/gamma_sum_at_each_t
+                #             except KeyError as ke:
+                #                 pdb.set_trace()
 
 
-                # fill pi[i][j] to estimate hierarchical transitions
-                for i in allnodes:
-                    if i.type!=hhmm.INTERNAL_STATE:
-                        continue
-                    for j in i.vertical_transitions:
-                        if j.type==hhmm.EOF_STATE:
-                            continue
-                        sigma_j = set(self.sigma(j))
-                        sigma_i=set(self.sigma(i))
-                        not_sigma_i=set(self.sigma(self.hierarchicalHMM.root)) - set_of_i
+                # # fill pi[i][j] to estimate hierarchical transitions
+                # for i in allnodes:
+                #     if i.type!=hhmm.INTERNAL_STATE:
+                #         continue
+                #     for j in i.vertical_transitions:
+                #         if j.type==hhmm.EOF_STATE:
+                #             continue
+                #         sigma_j = set(self.sigma(j))
+                #         sigma_i=set(self.sigma(i))
+                #         not_sigma_i=set(self.sigma(self.hierarchicalHMM.root)) - set_of_i
 
-                        gamma_sum_pi_numerator=0
-                        for k in sigma_j:
-                            gamma_sum_pi_numerator+=gamma[0][k]
+                #         gamma_sum_pi_numerator=0
+                #         for k in sigma_j:
+                #             gamma_sum_pi_numerator+=gamma[0][k]
 
-                        xi_numerator=0
-                        for t in range(len(observation.split())-2):
-                            for k in not_sigma_i:
-                                for l in sigma_j:
-                                    xi_numerator+=xi[t][k][l]
+                #         xi_numerator=0
+                #         for t in range(len(observation.split())-2):
+                #             for k in not_sigma_i:
+                #                 for l in sigma_j:
+                #                     xi_numerator+=xi[t][k][l]
 
-                        gamma_denominator=0
-                        for k in sigma_i:
-                            gamma_denominator+=gamma[0][k]
+                #         gamma_denominator=0
+                #         for k in sigma_i:
+                #             gamma_denominator+=gamma[0][k]
 
-                        xi_denominator=0
-                        for t in range(len(observation.split())-2):
-                            for k in not_sigma_i:
-                                for l in sigma_i:
-                                    xi_denominator+=xi[t][k][l]
-                        if (gamma_denominator + xi_denominator) > numpy.finfo(float).eps:
-                            pi[i][j]+=(gamma_sum_pi_numerator + xi_numerator)/(gamma_denominator + xi_denominator)
+                #         xi_denominator=0
+                #         for t in range(len(observation.split())-2):
+                #             for k in not_sigma_i:
+                #                 for l in sigma_i:
+                #                     xi_denominator+=xi[t][k][l]
+                #         if (gamma_denominator + xi_denominator) > numpy.finfo(float).eps:
+                #             pi[i][j]+=(gamma_sum_pi_numerator + xi_numerator)/(gamma_denominator + xi_denominator)
 
-                # re-estimate transitions from state i to i's eof state
-                for i in allnodes:
+                # # re-estimate transitions from state i to i's eof state
+                # for i in allnodes:
 
-                    # skip root because root is the 1 internal state that doesn't have an eof state
-                    if i==self.hierarchicalHMM.root:
-                        continue
-                    i_eof = self.hierarchicalHMM.get_eof_state(i)
-                    if i_eof not in trans_counts[i]:
-                        trans_counts[i][i_eof]=0
+                #     # skip root because root is the 1 internal state that doesn't have an eof state
+                #     if i==self.hierarchicalHMM.root:
+                #         continue
+                #     i_eof = self.hierarchicalHMM.get_eof_state(i)
+                #     if i_eof not in trans_counts[i]:
+                #         trans_counts[i][i_eof]=0
 
-                    sigma_i=set(self.sigma(i))
+                #     sigma_i=set(self.sigma(i))
 
-                    # all production states descended from i's parent 
-                    sigma_pi = set(self.sigma(i.parent))
+                #     # all production states descended from i's parent 
+                #     sigma_pi = set(self.sigma(i.parent))
 
-                    xi_numerator=0
-                    gamma_denominator=0
-                    for t in range(len(observation.split())-2):
-                        for k in sigma_i:
-                            for l in sigma_pi:
-                                xi_numerator+=xi[t][k][l]
+                #     xi_numerator=0
+                #     gamma_denominator=0
+                #     for t in range(len(observation.split())-2):
+                #         for k in sigma_i:
+                #             for l in sigma_pi:
+                #                 xi_numerator+=xi[t][k][l]
 
-                        gamma_denominator+=gamma[t][i]
+                #         gamma_denominator+=gamma[t][i]
 
-                    if gamma_denominator > numpy.finfo(float).eps:
-                        end_trans[i]+=xi_numerator/gamma_denominator
-                        trans_counts[i][i_eof]+=xi_numerator/gamma_denominator
+                #     if gamma_denominator > numpy.finfo(float).eps:
+                #         end_trans[i]+=xi_numerator/gamma_denominator
+                #         trans_counts[i][i_eof]+=xi_numerator/gamma_denominator
+
 
             # pdb.set_trace()
+
             # normalize trans_counts, pi, and end_trans
             for i in trans_counts:
                 if i==self.hierarchicalHMM.root:
@@ -639,33 +667,43 @@ class HMM:
 
 
             # transfer values from trans_counts and pi to the hhmm
-            for i in allnodes:
-                if i.type!=hhmm.INTERNAL_STATE:
-                    continue
-                if sum(pi[i].values())==0:
-                    continue
-                for j in i.vertical_transitions:
-                    if j.type==hhmm.EOF_STATE:
-                        continue
-                    i.vertical_transitions[j] = pi[i][j]
+            # for i in allnodes:
+            #     if i.type!=hhmm.INTERNAL_STATE:
+            #         continue
+            #     if sum(pi[i].values())==0:
+            #         continue
+            #     for j in i.vertical_transitions:
+            #         if j.type==hhmm.EOF_STATE:
+            #             continue
+            #         i.vertical_transitions[j] = pi[i][j]
 
 
 
 
             for i in allnodes:
+                if i==self.hierarchicalHMM.root:
+                    continue
                 if sum(trans_counts[i].values())==0:
+                    # print "zero sum we hv a problem"
+                    # pdb.set_trace()
                     continue
                 for j in i.horizontal_transitions:
-                    if j.type==hhmm.EOF_STATE:
-                        continue
+                    # if j.type==hhmm.EOF_STATE:
+                    #     continue
                     i.horizontal_transitions[j] = trans_counts[i][j]
             # for i in allnodes:
-
+            #     if i.type==hhmm.INTERNAL_STATE:
+            #         if sum(pi[i].values())==0:
+            #             continue
+            #         for j in i.vertical_transitions:
+            #             if j.type==hhmm.EOF_STATE:
+            #                 continue
+            #             i.vertical_transitions[j] = pi[i][j]
             #     try:
             #         for j in pi[i]:
             #             i.vertical_transitions[j] = pi[i][j]
             #     except KeyError as e:
-            #         pdb.set_trace()
+                    # pdb.set_trace()
             #     # if i==root, only copy the new vertical transitions
             #     # if i==self.hierarchicalHMM.root:
             #     #     continue                   
@@ -683,8 +721,7 @@ class HMM:
 
 
             self.reflatten()
-            # pdb.set_trace()
-        pdb.set_trace()
+        # pdb.set_trace()
         return log_likelihood
 
 
@@ -789,12 +826,12 @@ if __name__=='__main__':
     # OK UP TO HERE
 
     print "converting flattened hierarchicalHMM to normal hmm..."
-    hmm = HMM(hierarchicalHMM, 'toy.data')
+    hmm = HMM(hierarchicalHMM, 'toy2.data')
 
     
 
 
     print "beginning expectation maximization..."
-    alpha=hmm.expectation_maximization(hmm.observations,convergence=0.0001, iterations=300)
-    for i in xrange(4):
-        hmm.hierarchicalHMM.traverse(hmm.hierarchicalHMM.root, 30)
+    alpha=hmm.expectation_maximization(hmm.observations,convergence=0.001, iterations=200)
+    for i in xrange(10):
+        hmm.hierarchicalHMM.traverse(hmm.hierarchicalHMM.root,20)

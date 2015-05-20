@@ -34,22 +34,33 @@ notes = list(notes)
 def normalize(probability_dictionary):
 	"""Assumes the only values in the dictionary are numbers."""
 	total_sum = sum(probability_dictionary[key] for key in probability_dictionary) * 1.0
+	if total_sum < numpy.finfo(float).eps:
+		return probability_dictionary
+
 	for key in probability_dictionary:
 		probability_dictionary[key] = probability_dictionary[key]/total_sum 
 	return probability_dictionary
 
 def probabilistic_choice(probability_dictionary):
 	"""Probabilistically choose from a dictionary of probabilities."""
-	mixed_keys = probability_dictionary.keys()
-	random.shuffle(mixed_keys)
-	n = numpy.random.uniform()
-	for key in mixed_keys:
-		weight = probability_dictionary[key]
-		if n < weight:
-			return key
-		n -= weight
+	# mixed_keys = probability_dictionary.keys()
+	# random.shuffle(mixed_keys)
+	# n = numpy.random.uniform()
+	# for key in mixed_keys:
+	# 	weight = probability_dictionary[key]
+	# 	if n < weight:
+	# 		return key
+	# 	n -= weight
 
-	return mixed_keys[0]
+	# return mixed_keys[0]
+	keys = probability_dictionary.keys()
+	r = numpy.random.uniform()
+	cum_prob = 0
+	for key in keys:
+		cum_prob += probability_dictionary[key]
+		if r <= cum_prob:
+			return key
+	return key
 
 def write_midi(sequence, note_type='quarter'):
 	"""Writes an emission sequence to a MIDI file using music21."""
@@ -203,19 +214,25 @@ class HHMM:
 				if child.type is INTERNAL_STATE:
 					q.put(child)
 
-	def traverse(self, node):
+	def traverse(self, node, max_iter=float('inf')):
 		"""traverse an hhmm"""
 		emission_string=[]
 		started=0
 		current_node=self.root
+		types={0:"production state", 1:"internal state", 2: "eof state"}
+		counter=0
 		while True:
 			# time.sleep(1)
 			# print "Current node:", current_node
 			# print "Node depth:", current_node.depth
-			types={0:"production state", 1:"internal state", 2: "eof state"}
 			# print "Node type:", types[current_node.type]
 			# print "Parent node:", current_node.parent
 			# print "Horizontal Transitions Size:", len(current_node.horizontal_transitions), "\n"
+			counter+=1
+
+			if len(emission_string)>max_iter:
+				print emission_string
+				return emission_string
 			if current_node.type==INTERNAL_STATE:
 				current_node = probabilistic_choice(current_node.vertical_transitions)
 			elif current_node.type==PRODUCTION_STATE:

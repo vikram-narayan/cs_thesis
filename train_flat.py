@@ -1,7 +1,7 @@
 """
 train2.py
 Vikram Narayan
-Uses a flat HMM to train a hierarchical HMM. 
+Trains sub-HMMs within a HHMM as their own separate HMMs, combines them separately (meant for the poster presentation). 
 """
 # system imports
 import pdb
