@@ -41,7 +41,7 @@ def write_to_file(transposed_chorale, file_name):
 				# 		f.write(' '+note_val)
 				# else:
 				# 	f.write(' '+note_val)
-				write_list(' '+note_val)
+				write_list.append(' '+note_val)
 			if len(item.expressions)>0:
 				for exp in item.expressions:
 					if type(exp)==expressions.Fermata:
@@ -50,7 +50,7 @@ def write_to_file(transposed_chorale, file_name):
 	write_list.append(' )')
 	last_index = len(write_list)-1
 	second_to_last_index=last_index-1
-	if write_list[second_to_last_index]=='(' and write_list[last_index]=')':
+	if write_list[second_to_last_index]=='(' and write_list[last_index]==')':
 		write_list = write_list[:second_to_last_index]
 
 	for x in write_list:
@@ -58,10 +58,10 @@ def write_to_file(transposed_chorale, file_name):
 	f.write('\n')
 	f.close()
 
-def make_note_dict():
+def make_note_dict(filename):
 	"""make a dictionary of all notes """
 	notes={}
-	f=open('bach_chorales_cmajor_aminor_midi.data')
+	f=open(filename)
 	f2=f.read().split()
 	for item in f2:
 		if item=='\n':
@@ -77,7 +77,7 @@ if __name__=='__main__':
 	minors = dict([("A-", 1),("A", 0),("B-", -1),("B", -2),("C", -3),("D-", -4),("D", -5),("E-", 6),("E", 5),("F", 4),("F#",3),("G-", 3),("G", 2)])
 
 	# data_filename = 'bach_chorales_cmajor_aminor.data'
-	data_filename = 'temp.data'
+	data_filename = 'bach_chorales_cmajor_only.data'
 
 	# clear any previous contents of the file
 	f=open(data_filename,'w')
@@ -91,6 +91,7 @@ if __name__=='__main__':
 		if ksig.mode=='major':
 			transposed=chorale.parts[0].flat.transpose(majors[ksig.tonic.name])
 		else:
+			continue
 			transposed=chorale.parts[0].flat.transpose(minors[ksig.tonic.name])
 
 		# transposed=chorale.parts[0].flat.transpose('a4',classFilterList=['Note', 'Chord', 'KeySignature'])

@@ -35,19 +35,21 @@ class HMM:
         self.transitions={}
         self.emissions={}
         self.states=['0','1','2','3','#']
+        # self.states=hhmm.notes+['#']
 
         # initialize transition probabilities
         for state in self.states:
             self.transitions[state]=self.initialize_transition_probs_random()
+            # self.transitions[state]['(']=0
                 # if state2=='#':
                 #     self.transitions[state][state2]=0
                 # self.transitions[state][state2]=1.0/(len(self.states)-1)
-
 
         for state in self.states:
             hhmm.normalize(self.transitions[state])
 
         for state in self.states:
+            # self.emissions[state]=self.initialize_emission_probs(state,0.9)
             self.emissions[state]=self.initialize_emission_probs_random()
             # for note in hhmm.notes:
             #     self.emissions[state][note]=1
@@ -556,7 +558,6 @@ class HMM:
                 log_likelihood+=total_prob
                 fwd_matrix = self.forward_algorithm_scale(observation)
                 bk_matrix = self.backward_algorithm_scale(observation)
-
                 # new_emissions stores the counts for observation
                 new_emissions = {}
                 # new_transitions={}
@@ -668,6 +669,12 @@ class HMM:
         hhmm.write_midi(emission_notes)
 
 if __name__=='__main__':
+    import sys
+    # flat = HMM('bach_chorales_cmajor_only.data')
+    # alpha = flat.expectation_maximization(flat.observations[:25], convergence=0.001, iterations=300)
+    # pdb.set_trace()
+    # sys.quit()
+
     beginning = HMM('beginning.data')
     middle = HMM('middle.data')
     end = HMM('end.data')

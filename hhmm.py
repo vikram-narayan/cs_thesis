@@ -18,7 +18,7 @@ EOF_STATE=2
 
 # make a dictionary of all possible notes 
 notes={}
-f=open('temp.data')
+f=open('bach_chorales_cmajor_only.data')
 f2=f.read().split()
 for item in f2:
 	if item=='\n':
