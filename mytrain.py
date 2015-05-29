@@ -471,12 +471,14 @@ class HMM:
                     pdb.set_trace()
                     # return
                 print "EM: prob_of_obs:", prob_of_obs
+                print "EM: backward_prob",self.total_probability_bk(observation)
                 log_likelihood+=prob_of_obs
 
 
                 if math.isnan(log_likelihood):
                     pdb.set_trace()
                 print "EM: sanity check that alpha==beta:",prob_of_obs==self.total_probability_bk(observation)
+
 
 
 
@@ -787,7 +789,7 @@ if __name__=='__main__':
     hmm = HMM(hierarchicalHMM, 'bach_chorales_cmajor_only.data')
 
     print "beginning expectation maximization..."
-    alpha=hmm.expectation_maximization(hmm.observations[:10],convergence=0.001, iterations=100)
+    alpha=hmm.expectation_maximization(hmm.observations[:25],convergence=0.001, iterations=100)
     pdb.set_trace()
     for i in xrange(10):
         hmm.hierarchicalHMM.traverse(hmm.hierarchicalHMM.root,30)

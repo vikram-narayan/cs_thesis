@@ -72,11 +72,13 @@ def write_midi(sequence, note_type='quarter'):
 	four_by_four = music21.meter.TimeSignature('4/4')
 	stream_notes.append(four_by_four)
 	for index,letter in enumerate(sequence):
-		if letter==')' or letter=='fermata' or letter=='(':
+		if letter=='(':
 			continue
-			n = music21.note.Note(type='whole')
-			n.pitch.midi = int(letter)
-			stream_notes.append(n)
+		elif letter==')':
+			# n = music21.note.Note(type='whole')
+			# n.pitch.midi = int(letter)
+			# stream_notes.append(n)
+			stream_notes.append(music21.note.Rest(type='quarter'))
 		else:
 			n = music21.note.Note(type=random.choice(note_types))
 			n.pitch.midi = int(letter)
